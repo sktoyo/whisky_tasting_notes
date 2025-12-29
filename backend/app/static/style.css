@@ -1,0 +1,86 @@
+/* Custom styles */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* App background inspired by reference dashboard */
+.app-background {
+    min-height: 100vh;
+    background: radial-gradient(circle at top left, #fdf5ec 0, #f7eee4 38%, #f4ebdf 60%, #efe3d5 100%);
+}
+
+/* Keyword icon styles */
+.keyword-icon {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    text-align: center;
+    margin-right: 0.5rem;
+}
+
+/* Image upload square */
+.image-upload-square {
+    aspect-ratio: 1;
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Keyword chip improvements */
+.keyword-chip {
+    transition: all 0.2s ease;
+}
+
+.keyword-chip:hover:not(.selected) {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.keyword-chip.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Card hover effects */
+.note-card {
+    transition: all 0.3s ease;
+}
+
+.note-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+}
+
+/* Featured notes strip - warm amber gradient */
+.featured-strip {
+    background: linear-gradient(135deg, #e6b980 0%, #eacda3 50%, #f6e6c8 100%);
+    color: #3f2a1b;
+}
+
+/* Form improvements */
+.form-section {
+    background: rgba(255, 255, 255, 0.96);
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Detail input group */
+.detail-input-group {
+    background: #fdf7ef;
+    border-left: 4px solid #f59e0b;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-top: 0.75rem;
+}
+

@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "edit" %}노트 수정{% else %}노트 작성{% endif %} - 위스키 테이스팅 노트{% endblock %}
+
+{% block extra_head %}
+<style>
+    .keyword-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        background: #e5e7eb;
+        border-radius: 9999px;
+        margin: 0.25rem;
+        cursor: pointer;
+    }
+    .keyword-chip.selected {
+        background: #3b82f6;
+        color: white;
+    }
+    .keyword-chip:hover {
+        opacity: 0.8;
+    }
+    .keyword-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 1rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.5rem;
+        min-height: 100px;
+    }
+    .detail-input-group {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #f9fafb;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<form id="note-form" enctype="multipart/form-data" class="space-y-6">
+    <!-- 상단: 페이지 제목 -->
+    <div class="form-section">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">{% if mode == "edit" %}노트 수정{% else %}노트 작성{% endif %}</h1>
+        <p class="text-gray-600">위스키 테이스팅 노트를 작성해주세요</p>
+    </div>
+    
+    <!-- 위스키 정보 섹션 -->
+    <div class="form-section">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 좌측: 정사각형 이미지 업로드 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">대표 이미지</label>
+                <div class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
+                    <input type="file" id="image-input" name="image" accept="image/*" class="hidden">
+                    <div id="image-preview" class="image-upload-square mx-auto mb-4">
+                        {% if note and note.image_path %}
+                        <img src="/uploads/{{ note.image_path }}" alt="Preview" class="w-full h-full object-cover rounded-lg shadow-md">
+                        {% else %}
+                        <div class="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex flex-col items-center justify-center">
+                            <span class="text-4xl mb-2">📷</span>
+                            <span class="text-gray-500 text-sm">이미지를 선택하세요</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" onclick="document.getElementById('image-input').click()" 
+                            class="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium">
+                        이미지 선택
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 우측: 위스키 정보 입력 폼 -->
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        위스키 이름 <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="name" value="{% if note %}{{ note.name }}{% endif %}" required
+                           placeholder="예: 맥켈란 18년"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">증류소</label>
+                    <input type="text" name="distillery" value="{% if note %}{{ note.distillery or '' }}{% endif %}"
+                           placeholder="예: 맥켈란 증류소"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">숙성년도</label>
+                        <input type="number" name="age" value="{% if note %}{{ note.age or '' }}{% endif %}"
+                               placeholder="예: 18"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">도수(ABV)</label>
+                        <input type="number" step="0.1" name="abv" value="{% if note %}{{ note.abv or '' }}{% endif %}"
+                               placeholder="예: 43.0"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">캐스크 종류</label>
+                    <input type="text" name="cask_type" value="{% if note %}{{ note.cask_type or '' }}{% endif %}"
+                           placeholder="예: 셰리 오크"
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+                <div>
+                    <label class="flex items-center space-x-2 mb-3">
+                        <input type="checkbox" name="is_single_cask" {% if note and note.is_single_cask %}checked{% endif %}
+                               onchange="toggleCaskInfo(this.checked)" 
+                               class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="text-sm font-semibold text-gray-700">싱글 캐스크</span>
+                    </label>
+                    <div id="cask-info" style="display: {% if note and note.is_single_cask %}block{% else %}none{% endif %};">
+                        <input type="text" name="cask_info" value="{% if note %}{{ note.cask_info or '' }}{% endif %}"
+                               placeholder="캐스크 정보를 입력하세요"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">잔여량</label>
+                        <input type="text" name="bottle_remaining" value="{% if note %}{{ note.bottle_remaining or '' }}{% endif %}"
+                               placeholder="예: 70%"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">개봉일</label>
+                        <input type="date" name="bottle_opened_at" 
+                               value="{% if note and note.bottle_opened_at %}{{ note.bottle_opened_at.strftime('%Y-%m-%d') }}{% endif %}"
+                               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Nose / Palate / Finish -->
+    {% for scope_data in [("nose", "Nose (향)", nose_terms), ("palate", "Palate (맛)", palate_terms), ("finish", "Finish (여운)", finish_terms)] %}
+    {% set scope, scope_label, terms = scope_data %}
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
+            <span class="mr-3">{% if scope == "nose" %}👃{% elif scope == "palate" %}👅{% else %}💨{% endif %}</span>
+            {{ scope_label }}
+        </h2>
+        
+        <!-- 키워드 선택 영역 -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-3">키워드 선택</label>
+            <div class="keyword-list bg-[#fbf3e7] border-2 border-[#f1e0c8] rounded-xl p-4" id="keyword-list-{{ scope }}">
+                {% for term in terms %}
+                <div class="keyword-chip inline-flex items-center px-4 py-2 bg-[#fff8ee] border border-[#f1e0c8] rounded-full text-sm font-medium text-[#7a5630] hover:border-amber-400 hover:bg-amber-50 cursor-pointer transition-all" 
+                     data-scope="{{ scope }}" 
+                     data-term="{{ term.term }}" 
+                     data-icon="{{ term.icon_key or 'default' }}"
+                     data-source-type="{% if term.__class__.__name__ == 'UserTerm' %}user{% else %}vocabulary{% endif %}">
+                    <span class="keyword-icon">{{ get_icon_emoji(term.icon_key or 'default') }}</span>
+                    <span>{{ term.term }}</span>
+                </div>
+                {% endfor %}
+                <button type="button" onclick="showCustomKeywordModal('{{ scope }}')" 
+                        class="keyword-chip inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-200 to-amber-300 border-2 border-amber-400 text-[#7a5630] rounded-full text-sm font-semibold hover:from-amber-300 hover:to-amber-400 transition-all shadow-sm">
+                    <span class="mr-2">+</span>
+                    커스텀 키워드
+                </button>
+            </div>
+        </div>
+        
+        <!-- 선택된 키워드 표시 (순서 변경/삭제만) -->
+        <div id="keyword-details-{{ scope }}" class="space-y-4 mb-6">
+            <!-- JavaScript로 동적 생성 -->
+        </div>
+        
+        <!-- 섹션별 한 줄 총평 -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">{{ scope_label }} 한 줄 총평</label>
+            <p class="text-xs text-gray-500 mb-3">키워드와 상관없이 자유롭게 한 줄씩 추가할 수 있습니다.</p>
+            <div id="{{ scope }}-lines-container" class="space-y-2 mb-3">
+                <!-- JS로 한 줄 총평 input 목록 렌더링 -->
+            </div>
+            <button type="button" onclick="addSectionLine('{{ scope }}')" class="px-3 py-1.5 text-xs rounded-full border border-amber-400 text-[#7a5630] bg-amber-50 hover:bg-amber-100 transition">
+                + 한 줄 추가
+            </button>
+            <!-- 실제 전송용 hidden textarea -->
+            <textarea id="{{ scope }}_comment" name="{{ scope }}_comment" class="hidden">{% if note %}{% if scope == 'nose' %}{{ note.nose_comment or '' }}{% elif scope == 'palate' %}{{ note.palate_comment or '' }}{% else %}{{ note.finish_comment or '' }}{% endif %}{% endif %}</textarea>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- 총평 및 점수 -->
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900">총평 및 점수</h2>
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">한 줄 총평</label>
+            <p class="text-xs text-gray-500 mb-3">키워드와 상관없이 자유롭게 한 줄씩 추가할 수 있습니다.</p>
+            <div id="overall-lines-container" class="space-y-2 mb-3">
+                <!-- JS로 한 줄 총평 input 목록 렌더링 -->
+            </div>
+            <button type="button" onclick="addOverallLine()" class="px-3 py-1.5 text-xs rounded-full border border-amber-400 text-[#7a5630] bg-amber-50 hover:bg-amber-100 transition">
+                + 한 줄 추가
+            </button>
+            <!-- 실제 전송용 hidden textarea -->
+            <textarea id="overall_comment" name="overall_comment" class="hidden">{% if note %}{{ note.overall_comment or '' }}{% endif %}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">점수 (0-100, 선택)</label>
+            <div class="flex items-center space-x-4">
+                <input type="number" name="score" min="0" max="100" value="{% if note %}{{ note.score or '' }}{% endif %}"
+                       placeholder="0-100"
+                       class="w-32 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition">
+                <span class="text-gray-500 text-sm">점</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 액션 버튼 -->
+    <div class="form-section bg-gray-50">
+        <div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <label class="flex items-center space-x-2 cursor-pointer">
+                <input type="checkbox" name="is_draft" {% if note and note.is_draft %}checked{% endif %} 
+                       class="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
+                <span class="text-sm font-medium text-gray-700">임시 저장 (Draft)</span>
+            </label>
+            <div class="flex gap-3">
+                <button type="button" onclick="previewNote()" 
+                        class="px-6 py-2.5 bg-[#e5e1dd] hover:bg-[#d6d0c8] text-gray-700 rounded-lg transition-colors font-medium">
+                    미리보기
+                </button>
+                <button type="submit" 
+                        class="px-8 py-2.5 bg-gradient-to-r from-amber-700 to-amber-800 text-white rounded-lg hover:from-amber-800 hover:to-amber-900 transition-all duration-200 shadow-md hover:shadow-lg font-semibold">
+                    {% if mode == "edit" %}수정 완료{% else %}제출{% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- 커스텀 키워드 모달 -->
+<div id="custom-keyword-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-xl font-bold mb-4">커스텀 키워드 추가</h3>
+        <input type="text" id="custom-keyword-input" placeholder="키워드 입력" class="w-full px-3 py-2 border rounded mb-4">
+        <div class="flex gap-2 justify-end">
+            <button onclick="closeCustomKeywordModal()" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">취소</button>
+            <button onclick="addCustomKeyword()" class="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700">추가</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 전역 상태
+const selectedKeywords = {
+    nose: {% if mode == "edit" and nose_keywords %}{{ nose_keywords | tojson }}{% else %}[]{% endif %},
+    palate: {% if mode == "edit" and palate_keywords %}{{ palate_keywords | tojson }}{% else %}[]{% endif %},
+    finish: {% if mode == "edit" and finish_keywords %}{{ finish_keywords | tojson }}{% else %}[]{% endif %}
+};
+let currentCustomScope = null;
+let overallLines = [];
+const sectionLines = {
+    nose: [],
+    palate: [],
+    finish: []
+};
+
+// 이미지 미리보기
+document.getElementById('image-input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('image-preview').innerHTML = 
+                `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover rounded-lg shadow-md">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// 총평 한 줄 관리
+function renderOverallLines() {
+    const container = document.getElementById('overall-lines-container');
+    if (!container) return;
+
+    // 초기화
+    container.innerHTML = '';
+
+    overallLines.forEach((line, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm';
+        input.placeholder = '한 줄 평을 입력하세요...';
+        input.value = line;
+        input.addEventListener('change', function () {
+            updateOverallLine(idx, this.value);
+        });
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-2 py-1 text-xs text-gray-500 hover:text-red-500';
+        btn.textContent = '삭제';
+        btn.addEventListener('click', function () {
+            removeOverallLine(idx);
+        });
+
+        row.appendChild(input);
+        row.appendChild(btn);
+        container.appendChild(row);
+    });
+
+    // hidden textarea 업데이트
+    const hidden = document.getElementById('overall_comment');
+    if (hidden) {
+        hidden.value = overallLines.join('\n');
+    }
+}
+
+function addOverallLine(initial) {
+    const value = typeof initial === 'string' ? initial : '';
+    overallLines.push(value);
+    renderOverallLines();
+}
+
+function removeOverallLine(index) {
+    overallLines.splice(index, 1);
+    renderOverallLines();
+}
+
+function updateOverallLine(index, value) {
+    overallLines[index] = value;
+    // hidden textarea만 갱신
+    const hidden = document.getElementById('overall_comment');
+    if (hidden) {
+        hidden.value = overallLines.join('\n');
+    }
+}
+
+// 섹션별 한 줄 총평 관리
+function renderSectionLines(scope) {
+    const container = document.getElementById(`${scope}-lines-container`);
+    if (!container) return;
+
+    // 초기화
+    container.innerHTML = '';
+
+    sectionLines[scope].forEach((line, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm';
+        input.placeholder = '한 줄 평을 입력하세요...';
+        input.value = line;
+        input.addEventListener('change', function () {
+            updateSectionLine(scope, idx, this.value);
+        });
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-2 py-1 text-xs text-gray-500 hover:text-red-500';
+        btn.textContent = '삭제';
+        btn.addEventListener('click', function () {
+            removeSectionLine(scope, idx);
+        });
+
+        row.appendChild(input);
+        row.appendChild(btn);
+        container.appendChild(row);
+    });
+
+    // hidden textarea 업데이트
+    const hidden = document.getElementById(`${scope}_comment`);
+    if (hidden) {
+        hidden.value = sectionLines[scope].join('\n');
+    }
+}
+
+function addSectionLine(scope, initial) {
+    const value = typeof initial === 'string' ? initial : '';
+    sectionLines[scope].push(value);
+    renderSectionLines(scope);
+}
+
+function removeSectionLine(scope, index) {
+    sectionLines[scope].splice(index, 1);
+    renderSectionLines(scope);
+}
+
+function updateSectionLine(scope, index, value) {
+    sectionLines[scope][index] = value;
+    // hidden textarea만 갱신
+    const hidden = document.getElementById(`${scope}_comment`);
+    if (hidden) {
+        hidden.value = sectionLines[scope].join('\n');
+    }
+}
+
+// 키워드 선택 토글 (이벤트 위임 사용)
+function setupKeywordClickHandlers() {
+    ['nose', 'palate', 'finish'].forEach(scope => {
+        const keywordList = document.getElementById(`keyword-list-${scope}`);
+        if (keywordList) {
+            keywordList.addEventListener('click', function(e) {
+                const chip = e.target.closest('.keyword-chip');
+                if (!chip || chip.tagName === 'BUTTON') return; // 버튼이면 무시
+                
+                const chipScope = chip.dataset.scope;
+                const term = chip.dataset.term;
+                const icon = chip.dataset.icon || 'default';
+                const sourceType = chip.dataset.sourceType || 'vocabulary';
+                
+                if (!chipScope || !term) return; // 데이터가 없으면 무시
+                
+                // 이미 선택된 키워드면 제거
+                if (selectedKeywords[chipScope] && selectedKeywords[chipScope].some(k => k.term === term)) {
+                    const index = selectedKeywords[chipScope].findIndex(k => k.term === term);
+                    removeKeyword(chipScope, index);
+                } else {
+                    selectKeyword(chipScope, term, icon, sourceType);
+                }
+            });
+        }
+    });
+}
+
+function selectKeyword(scope, term, icon, sourceType = 'vocabulary') {
+    if (!selectedKeywords[scope]) {
+        selectedKeywords[scope] = [];
+    }
+    
+    // 중복 체크
+    if (selectedKeywords[scope].some(k => k.term === term)) {
+        return;
+    }
+    
+    selectedKeywords[scope].push({
+        term: term,
+        icon_key: icon,
+        detail_text: '', // 더 이상 사용하지 않지만 호환성을 위해 유지
+        position: selectedKeywords[scope].length,
+        source_type: sourceType
+    });
+    
+    updateKeywordUI(scope);
+}
+
+function removeKeyword(scope, index) {
+    selectedKeywords[scope].splice(index, 1);
+    // position 재정렬
+    selectedKeywords[scope].forEach((kw, idx) => {
+        kw.position = idx;
+    });
+    updateKeywordUI(scope);
+}
+
+function moveKeyword(scope, index, direction) {
+    if (direction === 'up' && index > 0) {
+        [selectedKeywords[scope][index], selectedKeywords[scope][index - 1]] = 
+            [selectedKeywords[scope][index - 1], selectedKeywords[scope][index]];
+        selectedKeywords[scope].forEach((kw, idx) => {
+            kw.position = idx;
+        });
+        updateKeywordUI(scope);
+    } else if (direction === 'down' && index < selectedKeywords[scope].length - 1) {
+        [selectedKeywords[scope][index], selectedKeywords[scope][index + 1]] = 
+            [selectedKeywords[scope][index + 1], selectedKeywords[scope][index]];
+        selectedKeywords[scope].forEach((kw, idx) => {
+            kw.position = idx;
+        });
+        updateKeywordUI(scope);
+    }
+}
+
+// Icon mapping (same as backend)
+function getIconEmoji(iconKey) {
+    const iconMap = {
+        "vanilla": "🌿", "oak": "🪵", "fruit": "🍎", "flower": "🌸", "herb": "🌿",
+        "spice": "🌶️", "honey": "🍯", "chocolate": "🍫", "coffee": "☕", "citrus": "🍋",
+        "peat": "🔥", "sea": "🌊", "earth": "🌍", "tobacco": "🚬", "nut": "🥜",
+        "caramel": "🍮", "dried_fruit": "🍇", "wood": "🪵", "sweet": "🍬", "bitter": "☕",
+        "sour": "🍋", "salty": "🧂", "smooth": "✨", "intense": "💥", "long": "⏱️",
+        "short": "⚡", "warm": "🔥", "cool": "❄️", "custom": "🏷️", "default": "🔖"
+    };
+    return iconMap[iconKey] || "🔖";
+}
+
+function updateKeywordUI(scope) {
+    // 선택된 키워드 칩 표시
+    document.querySelectorAll(`[data-scope="${scope}"].keyword-chip`).forEach(chip => {
+        const term = chip.dataset.term;
+        const isSelected = selectedKeywords[scope].some(k => k.term === term);
+        if (isSelected) {
+            chip.classList.add('selected');
+            chip.style.backgroundColor = '#f59e0b';
+            chip.style.color = '#fff';
+            chip.style.borderColor = '#f59e0b';
+            chip.style.cursor = 'default';
+        } else {
+            chip.classList.remove('selected');
+            chip.style.backgroundColor = '#fff8ee';
+            chip.style.color = '#7a5630';
+            chip.style.borderColor = '#f1e0c8';
+            chip.style.cursor = 'pointer';
+        }
+    });
+    
+    // 선택된 키워드 리스트 표시 (순서 변경/삭제만)
+    const detailsContainer = document.getElementById(`keyword-details-${scope}`);
+    if (selectedKeywords[scope].length === 0) {
+        detailsContainer.innerHTML = '';
+        return;
+    }
+    
+    detailsContainer.innerHTML = `
+        <div class="bg-gray-50 rounded-lg p-4">
+            <label class="block text-sm font-semibold text-gray-700 mb-3">선택된 키워드</label>
+            <div class="space-y-2">
+                ${selectedKeywords[scope].map((kw, index) => `
+                    <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg">${getIconEmoji(kw.icon_key || 'default')}</span>
+                            <span class="font-medium text-gray-900">${kw.term}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="moveKeyword('${scope}', ${index}, 'up')" 
+                                    class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors" 
+                                    ${index === 0 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>▲</button>
+                            <button type="button" onclick="moveKeyword('${scope}', ${index}, 'down')" 
+                                    class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors" 
+                                    ${index === selectedKeywords[scope].length - 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>▼</button>
+                            <button type="button" onclick="removeKeyword('${scope}', ${index})" 
+                                    class="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors">삭제</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function showCustomKeywordModal(scope) {
+    currentCustomScope = scope;
+    document.getElementById('custom-keyword-modal').classList.remove('hidden');
+    document.getElementById('custom-keyword-input').value = '';
+    document.getElementById('custom-keyword-input').focus();
+}
+
+function closeCustomKeywordModal() {
+    document.getElementById('custom-keyword-modal').classList.add('hidden');
+    currentCustomScope = null;
+}
+
+async function addCustomKeyword() {
+    const term = document.getElementById('custom-keyword-input').value.trim();
+    if (!term || !currentCustomScope) {
+        return;
+    }
+    
+    // API 호출하여 커스텀 키워드 생성
+    const formData = new FormData();
+    formData.append('scope', currentCustomScope);
+    formData.append('term', term);
+    formData.append('icon_key', 'custom');
+    
+    try {
+        const response = await fetch('/api/keywords/custom', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        
+        // 키워드 목록에 추가
+        const keywordList = document.getElementById(`keyword-list-${currentCustomScope}`);
+        const newChip = document.createElement('div');
+        newChip.className = 'keyword-chip inline-flex items-center px-4 py-2 bg-[#fff8ee] border border-[#f1e0c8] rounded-full text-sm font-medium text-[#7a5630] hover:border-amber-400 hover:bg-amber-50 cursor-pointer transition-all';
+        newChip.dataset.scope = currentCustomScope;
+        newChip.dataset.term = term;
+        newChip.dataset.icon = 'custom';
+        newChip.dataset.sourceType = 'user';
+        newChip.innerHTML = `<span class="keyword-icon">${getIconEmoji('custom')}</span><span>${term}</span>`;
+        
+        // + 버튼 앞에 삽입
+        const addButton = keywordList.querySelector('button');
+        keywordList.insertBefore(newChip, addButton);
+        
+        // 즉시 선택 (이벤트 위임으로 클릭 이벤트가 자동 처리됨)
+        selectKeyword(currentCustomScope, term, 'custom', 'user');
+        
+        closeCustomKeywordModal();
+    } catch (error) {
+        alert('커스텀 키워드 추가 실패: ' + error.message);
+    }
+}
+
+function toggleCaskInfo(show) {
+    document.getElementById('cask-info').style.display = show ? 'block' : 'none';
+}
+
+function previewNote() {
+    // 미리보기 기능 (간단한 alert로 대체)
+    alert('미리보기 기능은 상세 페이지에서 확인하세요.');
+}
+
+// 폼 제출
+document.getElementById('note-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // 총평 한 줄들을 hidden textarea에 반영
+    const hiddenOverall = document.getElementById('overall_comment');
+    if (hiddenOverall) {
+        hiddenOverall.value = overallLines.join('\n');
+    }
+    
+    // 섹션별 한 줄 총평을 hidden textarea에 반영
+    ['nose', 'palate', 'finish'].forEach(scope => {
+        const hidden = document.getElementById(`${scope}_comment`);
+        if (hidden) {
+            hidden.value = sectionLines[scope].join('\n');
+        }
+    });
+
+    const formData = new FormData(this);
+    
+    // 키워드 데이터 추가
+    const keywords = [];
+    ['nose', 'palate', 'finish'].forEach(scope => {
+        selectedKeywords[scope].forEach(kw => {
+            keywords.push({
+                scope: scope,
+                term: kw.term,
+                icon_key: kw.icon_key,
+                detail_text: '', // 더 이상 사용하지 않지만 호환성을 위해 빈 문자열
+                position: kw.position,
+                source_type: kw.source_type
+            });
+        });
+    });
+    formData.append('keywords_json', JSON.stringify(keywords));
+    
+    const url = {% if mode == "edit" %}'/api/notes/{{ note.id }}'{% else %}'/api/notes'{% endif %};
+    const method = {% if mode == "edit" %}'PUT'{% else %}'POST'{% endif %};
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = `/notes/${data.id}`;
+        } else {
+            alert('저장 실패: ' + (await response.text()));
+        }
+    } catch (error) {
+        alert('저장 실패: ' + error.message);
+    }
+});
+
+// 초기 로드 시 기존 키워드 표시
+['nose', 'palate', 'finish'].forEach(scope => {
+    if (selectedKeywords[scope] && selectedKeywords[scope].length > 0) {
+        // position 기준으로 정렬
+        selectedKeywords[scope].sort((a, b) => (a.position || 0) - (b.position || 0));
+        updateKeywordUI(scope);
+    }
+});
+
+// 초기 로드 시 기존 총평을 한 줄씩 분해
+window.addEventListener('DOMContentLoaded', () => {
+    // 키워드 클릭 핸들러 설정
+    setupKeywordClickHandlers();
+    
+    // 전체 총평
+    const hidden = document.getElementById('overall_comment');
+    if (hidden && hidden.value.trim() !== '') {
+        overallLines = hidden.value.split(/\r?\n/).map(l => l.trim());
+    } else {
+        overallLines = [''];
+    }
+    renderOverallLines();
+    
+    // 섹션별 총평
+    ['nose', 'palate', 'finish'].forEach(scope => {
+        const sectionHidden = document.getElementById(`${scope}_comment`);
+        if (sectionHidden && sectionHidden.value.trim() !== '') {
+            sectionLines[scope] = sectionHidden.value.split(/\r?\n/).map(l => l.trim());
+        } else {
+            sectionLines[scope] = [''];
+        }
+        renderSectionLines(scope);
+    });
+});
+</script>
+{% endblock %}
+

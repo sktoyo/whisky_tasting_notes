@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}{{ note.name }} - 위스키 테이스팅 노트{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 상단: 제목 및 액션 버튼 -->
+    <div class="form-section">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ note.name }}</h1>
+                {% if note.distillery %}
+                <p class="text-lg text-gray-600 flex items-center">
+                    <span class="mr-2">🏭</span>
+                    {{ note.distillery }}
+                </p>
+                {% endif %}
+            </div>
+            <div class="flex gap-3">
+                <a href="/notes/{{ note.id }}/edit" 
+                   class="px-6 py-2.5 bg-[#e5e1dd] hover:bg-[#d6d0c8] text-gray-800 rounded-lg transition-all shadow-sm hover:shadow-md font-medium">
+                    ✏️ 수정
+                </a>
+                <a href="/notes/{{ note.id }}/export.txt" 
+                   class="px-6 py-2.5 bg-gradient-to-r from-amber-700 to-amber-800 text-white rounded-lg hover:from-amber-800 hover:to-amber-900 transition-all shadow-md hover:shadow-lg font-medium">
+                    📥 Export
+                </a>
+            </div>
+        </div>
+        
+        <!-- 위스키 정보 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 좌측: 정사각형 이미지 -->
+            <div>
+                {% if note.image_path %}
+                <img src="/uploads/{{ note.image_path }}" alt="{{ note.name }}" 
+                     class="image-upload-square mx-auto object-cover rounded-xl shadow-lg">
+                {% else %}
+                <div class="image-upload-square mx-auto bg-gradient-to-br from-gray-200 to-gray-300 rounded-xl flex items-center justify-center shadow-lg">
+                    <div class="text-center">
+                        <span class="text-6xl mb-2 block">📷</span>
+                        <span class="text-gray-500">이미지 없음</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- 우측: 위스키 정보 -->
+            <div class="space-y-4">
+                <div class="bg-gray-50 rounded-lg p-5">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <span class="mr-2">ℹ️</span>
+                        위스키 정보
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {% if note.age %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">숙성년도</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.age }}년</p>
+                        </div>
+                        {% endif %}
+                        {% if note.abv %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">도수 (ABV)</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.abv }}%</p>
+                        </div>
+                        {% endif %}
+                        {% if note.cask_type %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">캐스크 종류</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.cask_type }}</p>
+                        </div>
+                        {% endif %}
+                        {% if note.is_single_cask and note.cask_info %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">싱글 캐스크</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.cask_info }}</p>
+                        </div>
+                        {% endif %}
+                        {% if note.bottle_remaining %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">잔여량</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.bottle_remaining }}</p>
+                        </div>
+                        {% endif %}
+                        {% if note.bottle_opened_at %}
+                        <div>
+                            <span class="text-sm font-semibold text-gray-600">개봉일</span>
+                            <p class="text-lg font-bold text-gray-900">{{ note.bottle_opened_at.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Nose -->
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
+            <span class="mr-3">👃</span>
+            Nose (향)
+        </h2>
+        {% if nose_keywords %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">키워드</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for kw in nose_keywords %}
+                <div class="inline-flex items-center px-4 py-2 bg-blue-100 border border-blue-300 rounded-full text-sm font-medium text-blue-800">
+                    <span class="mr-2">{{ get_icon_emoji(kw.icon_key or 'default') }}</span>
+                    <span>{{ kw.term }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if note.nose_comment %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">한 줄 총평</h3>
+            <div class="bg-blue-50 rounded-lg p-4">
+                <p class="text-gray-800 whitespace-pre-wrap leading-relaxed">{{ note.nose_comment }}</p>
+            </div>
+        </div>
+        {% endif %}
+        {% if not nose_keywords and not note.nose_comment %}
+        <div class="text-center py-8 bg-gray-50 rounded-lg">
+            <p class="text-gray-500">내용이 없습니다.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Palate -->
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
+            <span class="mr-3">👅</span>
+            Palate (맛)
+        </h2>
+        {% if palate_keywords %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">키워드</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for kw in palate_keywords %}
+                <div class="inline-flex items-center px-4 py-2 bg-green-100 border border-green-300 rounded-full text-sm font-medium text-green-800">
+                    <span class="mr-2">{{ get_icon_emoji(kw.icon_key or 'default') }}</span>
+                    <span>{{ kw.term }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if note.palate_comment %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">한 줄 총평</h3>
+            <div class="bg-green-50 rounded-lg p-4">
+                <p class="text-gray-800 whitespace-pre-wrap leading-relaxed">{{ note.palate_comment }}</p>
+            </div>
+        </div>
+        {% endif %}
+        {% if not palate_keywords and not note.palate_comment %}
+        <div class="text-center py-8 bg-gray-50 rounded-lg">
+            <p class="text-gray-500">내용이 없습니다.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Finish -->
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
+            <span class="mr-3">💨</span>
+            Finish (여운)
+        </h2>
+        {% if finish_keywords %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">키워드</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for kw in finish_keywords %}
+                <div class="inline-flex items-center px-4 py-2 bg-purple-100 border border-purple-300 rounded-full text-sm font-medium text-purple-800">
+                    <span class="mr-2">{{ get_icon_emoji(kw.icon_key or 'default') }}</span>
+                    <span>{{ kw.term }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if note.finish_comment %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">한 줄 총평</h3>
+            <div class="bg-purple-50 rounded-lg p-4">
+                <p class="text-gray-800 whitespace-pre-wrap leading-relaxed">{{ note.finish_comment }}</p>
+            </div>
+        </div>
+        {% endif %}
+        {% if not finish_keywords and not note.finish_comment %}
+        <div class="text-center py-8 bg-gray-50 rounded-lg">
+            <p class="text-gray-500">내용이 없습니다.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 총평 -->
+    <div class="form-section">
+        <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
+            <span class="mr-3">📝</span>
+            총평
+        </h2>
+        {% if note.overall_comment %}
+        <div class="bg-gray-50 rounded-lg p-6">
+            <p class="text-gray-800 whitespace-pre-wrap leading-relaxed text-lg">{{ note.overall_comment }}</p>
+        </div>
+        {% else %}
+        <div class="text-center py-8 bg-gray-50 rounded-lg">
+            <p class="text-gray-500">총평이 없습니다.</p>
+        </div>
+        {% endif %}
+        {% if note.score is not none %}
+        <div class="mt-6 flex items-center space-x-4">
+            <span class="text-lg font-semibold text-gray-700">점수:</span>
+            <div class="flex items-center space-x-2">
+                <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-600 to-amber-700 text-white text-xl font-bold shadow-sm">
+                    {{ note.score }}/100
+                </span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 메타 정보 -->
+    <div class="form-section bg-gray-50">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm text-gray-600">
+            <div class="mb-2 sm:mb-0">
+                <span class="font-semibold">작성일:</span>
+                <span class="ml-2">{{ note.created_at.strftime('%Y년 %m월 %d일 %H:%M') }}</span>
+            </div>
+            {% if note.updated_at != note.created_at %}
+            <div>
+                <span class="font-semibold">수정일:</span>
+                <span class="ml-2">{{ note.updated_at.strftime('%Y년 %m월 %d일 %H:%M') }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

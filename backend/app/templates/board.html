@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}게시판 - 위스키 테이스팅 노트{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- 오늘의 추천 -->
+    {% if featured_notes %}
+    <section class="featured-strip rounded-xl shadow-lg p-6">
+        <div class="flex items-center space-x-3 mb-6">
+            <span class="text-3xl">⭐</span>
+            <h2 class="text-2xl font-bold text-white">오늘의 추천 노트</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {% for note in featured_notes %}
+            <a href="/notes/{{ note.id }}" class="note-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+                {% if note.image_path %}
+                <img src="/uploads/{{ note.image_path }}" alt="{{ note.name }}" class="w-full h-40 object-cover">
+                {% else %}
+                <div class="w-full h-40 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                    <span class="text-gray-500 text-sm">📷</span>
+                </div>
+                {% endif %}
+                <div class="p-4">
+                    <h3 class="font-bold text-sm mb-2 text-gray-900 truncate">{{ note.name }}</h3>
+                    {% if note.distillery %}
+                    <p class="text-xs text-gray-600 mb-2">{{ note.distillery }}</p>
+                    {% endif %}
+                    <p class="text-xs text-gray-700 line-clamp-2 mb-2">{{ note.overall_comment[:60] if note.overall_comment else "" }}</p>
+                    {% if note.score is not none %}
+                    <div class="flex items-center space-x-1 mt-2">
+                        <span class="text-xs font-semibold text-blue-600">{{ note.score }}/100</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    
+    <!-- 검색 및 정렬 -->
+    <section class="form-section">
+        <form method="get" action="/" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">🔍 검색</label>
+                    <input type="text" name="search" value="{{ search }}" placeholder="노트 제목, 증류소, 키워드..." 
+                           class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">조건</label>
+                    <select name="search_mode" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        <option value="AND" {% if search_mode == "AND" %}selected{% endif %}>AND (모두 포함)</option>
+                        <option value="OR" {% if search_mode == "OR" %}selected{% endif %}>OR (하나라도 포함)</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">정렬 기준</label>
+                    <select name="sort_by" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        <option value="created_at" {% if sort_by == "created_at" %}selected{% endif %}>작성일</option>
+                        <option value="name" {% if sort_by == "name" %}selected{% endif %}>제목</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">순서</label>
+                    <select name="sort_order" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                        <option value="desc" {% if sort_order == "desc" %}selected{% endif %}>내림차순 ↓</option>
+                        <option value="asc" {% if sort_order == "asc" %}selected{% endif %}>오름차순 ↑</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 flex gap-2">
+                    <button type="submit" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-amber-700 to-amber-800 text-white rounded-lg hover:from-amber-800 hover:to-amber-900 transition-all shadow-md hover:shadow-lg font-medium">
+                        검색
+                    </button>
+                    <a href="/" class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors font-medium">
+                        초기화
+                    </a>
+                </div>
+            </div>
+        </form>
+        
+        <!-- 뷰 모드 토글 -->
+        <div class="mt-6 flex justify-end gap-2 border-t pt-4">
+            <span class="text-sm font-semibold text-gray-700 mr-2 flex items-center">뷰 모드:</span>
+            <button onclick="setView('card')" 
+                    class="px-4 py-2 rounded-lg transition-all font-medium {% if view == 'card' %}bg-amber-700 text-white shadow-md{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                📋 카드
+            </button>
+            <button onclick="setView('list')" 
+                    class="px-4 py-2 rounded-lg transition-all font-medium {% if view == 'list' %}bg-amber-700 text-white shadow-md{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                📊 리스트
+            </button>
+        </div>
+    </section>
+    
+    <!-- 노트 목록 -->
+    <section>
+        {% if notes %}
+            {% if view == "card" %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="notes-container">
+                {% for note in notes %}
+                <a href="/notes/{{ note.id }}" class="note-card bg-white rounded-xl shadow-md overflow-hidden group">
+                    {% if note.image_path %}
+                    <div class="relative overflow-hidden">
+                        <img src="/uploads/{{ note.image_path }}" alt="{{ note.name }}" class="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-300">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </div>
+                    {% else %}
+                    <div class="w-full h-56 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                        <span class="text-gray-500 text-4xl">📷</span>
+                    </div>
+                    {% endif %}
+                    <div class="p-5">
+                        <h3 class="font-bold text-lg mb-2 text-gray-900 line-clamp-1">{{ note.name }}</h3>
+                        {% if note.distillery %}
+                        <p class="text-sm text-gray-600 mb-3 flex items-center">
+                            <span class="mr-1">🏭</span>
+                            {{ note.distillery }}
+                        </p>
+                        {% endif %}
+                        <p class="text-sm text-gray-700 line-clamp-3 mb-3">{{ note.overall_comment[:120] if note.overall_comment else "" }}</p>
+                        <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                            <p class="text-xs text-gray-500">{{ note.created_at.strftime('%Y-%m-%d') }}</p>
+                            {% if note.score is not none %}
+                            <span class="text-xs font-semibold text-[#7a5630] bg-amber-50 px-2 py-1 rounded">{{ note.score }}/100</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl shadow-md overflow-hidden" id="notes-container">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">이미지</th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">이름</th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">증류소</th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">총평</th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">점수</th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">작성일</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for note in notes %}
+                            <tr class="hover:bg-blue-50 transition-colors cursor-pointer" onclick="window.location.href='/notes/{{ note.id }}'">
+                                <td class="px-6 py-4">
+                                    {% if note.image_path %}
+                                    <img src="/uploads/{{ note.image_path }}" alt="{{ note.name }}" class="w-20 h-20 object-cover rounded-lg shadow-sm">
+                                    {% else %}
+                                    <div class="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex items-center justify-center">
+                                        <span class="text-gray-500 text-xl">📷</span>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="/notes/{{ note.id }}" class="font-bold text-gray-900 hover:text-amber-700 transition-colors">
+                                        {{ note.name }}
+                                    </a>
+                                </td>
+                                <td class="px-6 py-4 text-gray-600">
+                                    {% if note.distillery %}
+                                    <span class="flex items-center">
+                                        <span class="mr-1">🏭</span>
+                                        {{ note.distillery }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-700 max-w-md">
+                                    <p class="line-clamp-2">{{ note.overall_comment[:150] if note.overall_comment else "-" }}</p>
+                                </td>
+                                <td class="px-6 py-4">
+                                    {% if note.score is not none %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">
+                                        {{ note.score }}/100
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ note.created_at.strftime('%Y-%m-%d') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+        <div class="form-section text-center py-16">
+            <div class="text-6xl mb-4">{% if search %}🔍{% else %}📝{% endif %}</div>
+            <p class="text-gray-600 text-lg mb-6 font-medium">
+                {% if search %}검색 결과가 없습니다.{% else %}아직 작성된 노트가 없습니다.{% endif %}
+            </p>
+            <a href="/notes/new" class="inline-block px-8 py-3 bg-gradient-to-r from-amber-700 to-amber-800 text-white rounded-lg hover:from-amber-800 hover:to-amber-900 transition-all shadow-md hover:shadow-lg font-semibold">
+                {% if search %}다시 검색{% else %}첫 노트 작성하기{% endif %}
+            </a>
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setView(view) {
+    const url = new URL(window.location);
+    url.searchParams.set('view', view);
+    window.location = url.toString();
+}
+</script>
+{% endblock %}
+
