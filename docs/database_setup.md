@@ -26,10 +26,13 @@
 ### 4. 기본 키워드 추가 (Seeding)
 - **파일**: `backend/app/seed.py`
 - **함수**: `seed_vocabulary()`
-  - Nose: 20개 키워드
-  - Palate: 20개 키워드
-  - Finish: 20개 키워드
-  - **자동 중복 체크**: 이미 존재하는 키워드는 건너뜀
+  - **Flavor Wheel 기반 계층 구조** 키워드 생성
+  - **한국어 키워드**로 저장
+  - 각 scope(nose/palate/finish)별로 동일한 계층 구조 적용
+  - 대분류(level=1): 6개 (과일향, 꽃향, 단맛, 견과류, 향신료, 고소한)
+  - 중분류(level=2): 각 대분류당 4개씩 총 24개
+  - 세부 키워드(level=3): 각 중분류당 4개씩 총 96개
+  - **자동 중복 체크**: (scope, term, level) 조합으로 중복 확인
 
 ## 데이터베이스 모델
 
@@ -58,10 +61,15 @@
 ### VocabularyTerm (기본 키워드 사전)
 ```python
 - scope: nose/palate/finish
-- term: 키워드 텍스트
-- icon_key: 아이콘 매핑 키
+- term: 키워드 텍스트 (한국어)
+- icon_key: 아이콘 이모지 (이미 이모지로 저장됨)
+- category: 대분류 (과일향, 꽃향, 단맛, 견과류, 향신료, 고소한)
+- subcategory: 중분류 (베리류, 시트러스, 바닐라 등)
+- level: 계층 레벨 (1=대분류, 2=중분류, 3=세부키워드)
 - created_at: 생성일
-- UniqueConstraint(scope, term): scope+term 조합 unique
+- UniqueConstraint(scope, term, level): (scope, term, level) 조합 unique
+  - 같은 term이 같은 scope에서 level이 다르면 별도 저장 가능
+  - 예: "견과류" (level=1)과 "견과류" (level=2)는 별도 항목
 ```
 
 ### UserTerm (커스텀 키워드)
@@ -115,6 +123,7 @@ python -m uvicorn app.main:app --reload
 
 ## DB 확인 도구
 
+### check_db.py
 **파일**: `backend/check_db.py`
 
 실행:
@@ -128,6 +137,21 @@ python backend\check_db.py
 - Nose/Palate/Finish 키워드 목록
 - 중복 키워드 확인
 
+### explore_db.py (대화형 탐색 도구)
+**파일**: `backend/explore_db.py`
+
+실행:
+```powershell
+python backend\explore_db.py
+```
+
+주요 기능:
+- `tables` - 모든 테이블 목록 보기
+- `show <table>` - 테이블 상세 정보 보기
+- `search <keyword>` - 키워드 검색
+- `hierarchy [scope]` - 계층 구조 키워드 보기
+- `sql <query>` - SQL 쿼리 직접 실행
+
 ## 주의사항
 
 ### 스키마 변경 시
@@ -137,8 +161,17 @@ SQLAlchemy의 `create_all()`은 **기존 테이블을 변경하지 않습니다*
 1. DB 파일 삭제 필요
 2. 또는 마이그레이션 도구 사용 (Alembic 등)
 
-### 기본 키워드 중복 문제
-- `VocabularyTerm` 모델에서 `UniqueConstraint('scope', 'term')` 사용
-- 같은 키워드(예: "바닐라")가 여러 scope(nose/palate/finish)에 나타날 수 있음
-- 각 scope별로 독립적으로 관리됨
+### 키워드 계층 구조
+- **Flavor Wheel 기반 3단계 계층 구조**
+  - Level 1 (대분류): 과일향, 꽃향, 단맛, 견과류, 향신료, 고소한
+  - Level 2 (중분류): 각 대분류별 4개 (예: 베리류, 시트러스, 바닐라 등)
+  - Level 3 (세부 키워드): 각 중분류별 4개 (예: 딸기, 레몬, 사과 등)
+- **중복 허용 규칙**
+  - `UniqueConstraint('scope', 'term', 'level')` 사용
+  - 같은 term이 같은 scope에서 level이 다르면 별도 저장 가능
+  - 예: "견과류" (level=1, 대분류)와 "견과류" (level=2, 중분류)는 별도 항목
+  - 예: "다크 초콜릿" (level=2, 중분류)와 "다크 초콜릿" (level=3, 세부 키워드)는 별도 항목
+- **한국어 키워드**
+  - 모든 키워드는 한국어로 저장됨
+  - `docs/flavor_category.json`의 영어 키워드를 한국어로 번역하여 저장
 

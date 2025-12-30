@@ -31,40 +31,17 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Icon mapping function for templates
 def get_icon_emoji(icon_key):
-    """Map icon_key to emoji"""
-    icon_map = {
-        "vanilla": "🌿",
-        "oak": "🪵",
-        "fruit": "🍎",
-        "flower": "🌸",
-        "herb": "🌿",
-        "spice": "🌶️",
-        "honey": "🍯",
-        "chocolate": "🍫",
-        "coffee": "☕",
-        "citrus": "🍋",
-        "peat": "🔥",
-        "sea": "🌊",
-        "earth": "🌍",
-        "tobacco": "🚬",
-        "nut": "🥜",
-        "caramel": "🍮",
-        "dried_fruit": "🍇",
-        "wood": "🪵",
-        "sweet": "🍬",
-        "bitter": "☕",
-        "sour": "🍋",
-        "salty": "🧂",
-        "smooth": "✨",
-        "intense": "💥",
-        "long": "⏱️",
-        "short": "⚡",
-        "warm": "🔥",
-        "cool": "❄️",
-        "custom": "🏷️",
-        "default": "🔖"
-    }
-    return icon_map.get(icon_key, "🔖")
+    """Convert icon_key to emoji - icon_key is already stored as emoji in database"""
+    if not icon_key:
+        return "🔖"
+    
+    # icon_key가 이미 이모지인 경우 (길이 1-2인 유니코드 문자)
+    # 대부분의 이모지는 1-2자 길이입니다
+    if len(icon_key) <= 2:
+        return icon_key
+    
+    # 예상치 못한 경우 기본값 반환
+    return "🔖"
 
 # Register function in Jinja2 environment
 templates.env.globals['get_icon_emoji'] = get_icon_emoji
@@ -170,26 +147,69 @@ async def board_page(
 @app.get("/notes/new", response_class=HTMLResponse)
 async def create_note_page(request: Request, db: Session = Depends(get_db)):
     """노트 작성 페이지"""
-    # Get vocabulary terms and user terms for keyword picker
-    # Combine both types of keywords for each scope
-    nose_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "nose").all()
-    nose_user = db.query(UserTerm).filter(UserTerm.scope == "nose").all()
-    nose_terms = list(nose_vocab) + list(nose_user)
+    # Get vocabulary terms organized by hierarchy
+    def get_hierarchical_terms(scope):
+        vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == scope).order_by(VocabularyTerm.level, VocabularyTerm.category, VocabularyTerm.subcategory).all()
+        user = db.query(UserTerm).filter(UserTerm.scope == scope).all()
+        
+        # Organize into hierarchical structure
+        hierarchy = {}
+        categories = {}  # Level 1 terms
+        subcategories = {}  # Level 2 terms by category
+        
+        for term in vocab:
+            cat = term.category or "기타"
+            subcat = term.subcategory or "일반"
+            
+            # Store category (level 1)
+            if term.level == 1:
+                categories[cat] = {
+                    "term": term.term,
+                    "icon_key": term.icon_key
+                }
+            
+            # Store subcategory (level 2)
+            if term.level == 2:
+                if cat not in subcategories:
+                    subcategories[cat] = {}
+                subcategories[cat][subcat] = {
+                    "term": term.term,
+                    "icon_key": term.icon_key
+                }
+            
+            # Organize detail keywords (level 3)
+            if cat not in hierarchy:
+                hierarchy[cat] = {}
+            if subcat not in hierarchy[cat]:
+                hierarchy[cat][subcat] = []
+            
+            if term.level == 3:
+                # Convert VocabularyTerm to dict for JSON serialization
+                hierarchy[cat][subcat].append({
+                    "term": term.term,
+                    "icon_key": term.icon_key
+                })
+        
+        # Convert UserTerm to dict for JSON serialization
+        user_dicts = [{"term": u.term, "icon_key": u.icon_key} for u in user]
+        
+        return {
+            "hierarchy": hierarchy, 
+            "user_terms": user_dicts,
+            "categories": categories,
+            "subcategories": subcategories
+        }
     
-    palate_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "palate").all()
-    palate_user = db.query(UserTerm).filter(UserTerm.scope == "palate").all()
-    palate_terms = list(palate_vocab) + list(palate_user)
-    
-    finish_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "finish").all()
-    finish_user = db.query(UserTerm).filter(UserTerm.scope == "finish").all()
-    finish_terms = list(finish_vocab) + list(finish_user)
+    nose_data = get_hierarchical_terms("nose")
+    palate_data = get_hierarchical_terms("palate")
+    finish_data = get_hierarchical_terms("finish")
     
     return templates.TemplateResponse("note_form.html", {
         "request": request,
         "note": None,
-        "nose_terms": nose_terms,
-        "palate_terms": palate_terms,
-        "finish_terms": finish_terms,
+        "nose_data": nose_data,
+        "palate_data": palate_data,
+        "finish_data": finish_data,
         "mode": "create"
     })
 
@@ -237,19 +257,38 @@ async def edit_note_page(
     palate_keywords = [{"term": k.term, "icon_key": k.icon_key, "detail_text": k.detail_text, "position": k.position, "source_type": k.source_type} for k in keywords if k.scope == "palate"]
     finish_keywords = [{"term": k.term, "icon_key": k.icon_key, "detail_text": k.detail_text, "position": k.position, "source_type": k.source_type} for k in keywords if k.scope == "finish"]
     
-    # Get vocabulary terms and user terms for keyword picker
-    # Combine both types of keywords for each scope
-    nose_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "nose").all()
-    nose_user = db.query(UserTerm).filter(UserTerm.scope == "nose").all()
-    nose_terms = list(nose_vocab) + list(nose_user)
+    # Get vocabulary terms organized by hierarchy
+    def get_hierarchical_terms(scope):
+        vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == scope).order_by(VocabularyTerm.level, VocabularyTerm.category, VocabularyTerm.subcategory).all()
+        user = db.query(UserTerm).filter(UserTerm.scope == scope).all()
+        
+        # Organize into hierarchical structure
+        hierarchy = {}
+        for term in vocab:
+            cat = term.category or "기타"
+            subcat = term.subcategory or "일반"
+            
+            if cat not in hierarchy:
+                hierarchy[cat] = {}
+            if subcat not in hierarchy[cat]:
+                hierarchy[cat][subcat] = []
+            
+            # Only add level 3 (detail keywords) to the lists
+            if term.level == 3:
+                # Convert VocabularyTerm to dict for JSON serialization
+                hierarchy[cat][subcat].append({
+                    "term": term.term,
+                    "icon_key": term.icon_key
+                })
+        
+        # Convert UserTerm to dict for JSON serialization
+        user_dicts = [{"term": u.term, "icon_key": u.icon_key} for u in user]
+        
+        return {"hierarchy": hierarchy, "user_terms": user_dicts}
     
-    palate_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "palate").all()
-    palate_user = db.query(UserTerm).filter(UserTerm.scope == "palate").all()
-    palate_terms = list(palate_vocab) + list(palate_user)
-    
-    finish_vocab = db.query(VocabularyTerm).filter(VocabularyTerm.scope == "finish").all()
-    finish_user = db.query(UserTerm).filter(UserTerm.scope == "finish").all()
-    finish_terms = list(finish_vocab) + list(finish_user)
+    nose_data = get_hierarchical_terms("nose")
+    palate_data = get_hierarchical_terms("palate")
+    finish_data = get_hierarchical_terms("finish")
     
     return templates.TemplateResponse("note_form.html", {
         "request": request,
@@ -257,9 +296,9 @@ async def edit_note_page(
         "nose_keywords": nose_keywords,
         "palate_keywords": palate_keywords,
         "finish_keywords": finish_keywords,
-        "nose_terms": nose_terms,
-        "palate_terms": palate_terms,
-        "finish_terms": finish_terms,
+        "nose_data": nose_data,
+        "palate_data": palate_data,
+        "finish_data": finish_data,
         "mode": "edit"
     })
 

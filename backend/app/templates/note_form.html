@@ -139,32 +139,66 @@
     </div>
     
     <!-- Nose / Palate / Finish -->
-    {% for scope_data in [("nose", "Nose (향)", nose_terms), ("palate", "Palate (맛)", palate_terms), ("finish", "Finish (여운)", finish_terms)] %}
-    {% set scope, scope_label, terms = scope_data %}
+    {% for scope_data in [("nose", "Nose (향)", nose_data), ("palate", "Palate (맛)", palate_data), ("finish", "Finish (여운)", finish_data)] %}
+    {% set scope, scope_label, data = scope_data %}
     <div class="form-section">
         <h2 class="text-2xl font-bold mb-6 text-gray-900 flex items-center">
             <span class="mr-3">{% if scope == "nose" %}👃{% elif scope == "palate" %}👅{% else %}💨{% endif %}</span>
             {{ scope_label }}
         </h2>
         
-        <!-- 키워드 선택 영역 -->
+        <!-- 키워드 선택 영역 (계층적 구조) -->
         <div class="mb-6">
             <label class="block text-sm font-semibold text-gray-700 mb-3">키워드 선택</label>
-            <div class="keyword-list bg-[#fbf3e7] border-2 border-[#f1e0c8] rounded-xl p-4" id="keyword-list-{{ scope }}">
-                {% for term in terms %}
-                <div class="keyword-chip inline-flex items-center px-4 py-2 bg-[#fff8ee] border border-[#f1e0c8] rounded-full text-sm font-medium text-[#7a5630] hover:border-amber-400 hover:bg-amber-50 cursor-pointer transition-all" 
-                     data-scope="{{ scope }}" 
-                     data-term="{{ term.term }}" 
-                     data-icon="{{ term.icon_key or 'default' }}"
-                     data-source-type="{% if term.__class__.__name__ == 'UserTerm' %}user{% else %}vocabulary{% endif %}">
-                    <span class="keyword-icon">{{ get_icon_emoji(term.icon_key or 'default') }}</span>
-                    <span>{{ term.term }}</span>
+            
+            <!-- 대분류 선택 (칩 형태로 선택 가능) -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-600 mb-2">대분류</label>
+                <div class="flex flex-wrap gap-2" id="category-list-{{ scope }}">
+                    {% for category, cat_data in data.categories.items() %}
+                    <div class="category-chip inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-100 to-amber-200 border-2 border-amber-300 text-amber-900 rounded-full text-base font-bold hover:from-amber-200 hover:to-amber-300 cursor-pointer transition-all shadow-sm"
+                         data-scope="{{ scope }}"
+                         data-category="{{ category }}"
+                         data-term="{{ cat_data.term }}"
+                         data-icon="{{ cat_data.icon_key }}"
+                         onclick="toggleCategory('{{ scope }}', '{{ category }}')">
+                        <span class="mr-2">{{ cat_data.icon_key }}</span>
+                        <span>{{ cat_data.term }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
+            </div>
+            
+            <!-- 중분류 및 세부 키워드 표시 영역 -->
+            <div id="keyword-picker-{{ scope }}" class="bg-[#fbf3e7] border-2 border-[#f1e0c8] rounded-xl p-4 min-h-[100px]">
+                <p class="text-gray-500 text-base text-center py-8">대분류를 선택하세요</p>
+            </div>
+            
+            <!-- 사용자 커스텀 키워드 -->
+            {% if data.user_terms %}
+            <div class="mt-4">
+                <label class="block text-xs font-semibold text-gray-600 mb-2">커스텀 키워드</label>
+                <div class="flex flex-wrap gap-2">
+                    {% for term in data.user_terms %}
+                    <div class="keyword-chip inline-flex items-center px-4 py-2 bg-purple-100 border-2 border-purple-300 rounded-full text-base font-medium text-purple-800 hover:border-purple-400 hover:bg-purple-200 cursor-pointer transition-all" 
+                         data-scope="{{ scope }}" 
+                         data-term="{{ term.term }}" 
+                         data-icon="{{ term.icon_key or 'custom' }}"
+                         data-source-type="user">
+                        <span class="keyword-icon mr-2">{{ get_icon_emoji(term.icon_key or 'custom') }}</span>
+                        <span>{{ term.term }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- 커스텀 키워드 추가 버튼 -->
+            <div class="mt-3">
                 <button type="button" onclick="showCustomKeywordModal('{{ scope }}')" 
-                        class="keyword-chip inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-200 to-amber-300 border-2 border-amber-400 text-[#7a5630] rounded-full text-sm font-semibold hover:from-amber-300 hover:to-amber-400 transition-all shadow-sm">
+                        class="px-4 py-2 bg-gradient-to-r from-purple-200 to-purple-300 border-2 border-purple-400 text-purple-900 rounded-lg text-sm font-semibold hover:from-purple-300 hover:to-purple-400 transition-all shadow-sm">
                     <span class="mr-2">+</span>
-                    커스텀 키워드
+                    커스텀 키워드 추가
                 </button>
             </div>
         </div>
@@ -259,12 +293,40 @@ const selectedKeywords = {
     palate: {% if mode == "edit" and palate_keywords %}{{ palate_keywords | tojson }}{% else %}[]{% endif %},
     finish: {% if mode == "edit" and finish_keywords %}{{ finish_keywords | tojson }}{% else %}[]{% endif %}
 };
+
+// 계층 구조 데이터
+const keywordHierarchy = {
+    nose: {{ nose_data.hierarchy | tojson }},
+    palate: {{ palate_data.hierarchy | tojson }},
+    finish: {{ finish_data.hierarchy | tojson }}
+};
+
+// 대분류 및 중분류 데이터
+const categoryData = {
+    nose: {{ nose_data.categories | tojson }},
+    palate: {{ palate_data.categories | tojson }},
+    finish: {{ finish_data.categories | tojson }}
+};
+
+const subcategoryData = {
+    nose: {{ nose_data.subcategories | tojson }},
+    palate: {{ palate_data.subcategories | tojson }},
+    finish: {{ finish_data.subcategories | tojson }}
+};
+
 let currentCustomScope = null;
 let overallLines = [];
 const sectionLines = {
     nose: [],
     palate: [],
     finish: []
+};
+
+// 현재 선택된 카테고리 추적
+const currentCategory = {
+    nose: null,
+    palate: null,
+    finish: null
 };
 
 // 이미지 미리보기
@@ -402,31 +464,147 @@ function updateSectionLine(scope, index, value) {
     }
 }
 
-// 키워드 선택 토글 (이벤트 위임 사용)
-function setupKeywordClickHandlers() {
-    ['nose', 'palate', 'finish'].forEach(scope => {
-        const keywordList = document.getElementById(`keyword-list-${scope}`);
-        if (keywordList) {
-            keywordList.addEventListener('click', function(e) {
-                const chip = e.target.closest('.keyword-chip');
-                if (!chip || chip.tagName === 'BUTTON') return; // 버튼이면 무시
-                
-                const chipScope = chip.dataset.scope;
-                const term = chip.dataset.term;
-                const icon = chip.dataset.icon || 'default';
-                const sourceType = chip.dataset.sourceType || 'vocabulary';
-                
-                if (!chipScope || !term) return; // 데이터가 없으면 무시
-                
-                // 이미 선택된 키워드면 제거
-                if (selectedKeywords[chipScope] && selectedKeywords[chipScope].some(k => k.term === term)) {
-                    const index = selectedKeywords[chipScope].findIndex(k => k.term === term);
-                    removeKeyword(chipScope, index);
-                } else {
-                    selectKeyword(chipScope, term, icon, sourceType);
-                }
-            });
+// 카테고리 토글 (대분류 선택) - 키워드 추가 없이 펼치기만
+function toggleCategory(scope, category) {
+    currentCategory[scope] = category;
+    
+    // 카테고리 칩 스타일 업데이트
+    const categoryChips = document.querySelectorAll(`#category-list-${scope} .category-chip`);
+    categoryChips.forEach(chip => {
+        if (chip.dataset.category === category) {
+            chip.classList.remove('from-amber-100', 'to-amber-200', 'text-amber-900', 'border-amber-300');
+            chip.classList.add('bg-amber-500', 'text-white', 'border-amber-600');
+        } else {
+            chip.classList.remove('bg-amber-500', 'text-white', 'border-amber-600');
+            chip.classList.add('from-amber-100', 'to-amber-200', 'text-amber-900', 'border-amber-300');
         }
+    });
+    
+    // 중분류 및 세부 키워드 표시 (대분류 버튼은 displaySubcategories 내부에서 추가됨)
+    displaySubcategories(scope, category);
+}
+
+// 중분류 및 세부 키워드 표시
+function displaySubcategories(scope, category) {
+    const pickerContainer = document.getElementById(`keyword-picker-${scope}`);
+    const subcategories = keywordHierarchy[scope][category];
+    const subcatInfo = subcategoryData[scope][category] || {};
+    const categoryInfo = categoryData[scope][category];
+    
+    if (!subcategories || Object.keys(subcategories).length === 0) {
+        pickerContainer.innerHTML = '<p class="text-gray-500 text-base text-center py-8">키워드가 없습니다</p>';
+        return;
+    }
+    
+    // 대분류 정보 가져오기
+    const categoryTerm = categoryInfo ? categoryInfo.term : category;
+    const categoryIcon = categoryInfo ? categoryInfo.icon_key : '🔖';
+    const isCategorySelected = selectedKeywords[scope] && selectedKeywords[scope].some(k => k.term === categoryTerm);
+    const categorySelectedClass = isCategorySelected ? 'bg-amber-500 text-white border-amber-500' : 'bg-gradient-to-r from-amber-100 to-amber-200 border-2 border-amber-300 text-amber-900 hover:from-amber-200 hover:to-amber-300';
+    
+    let html = '<div class="space-y-4">';
+    
+    // 대분류 버튼 추가 (최상단)
+    // HTML 속성에서 작은따옴표를 이스케이프
+    const categoryTermEscaped = categoryTerm.replace(/'/g, "\\'");
+    const categoryTermAttr = categoryTerm.replace(/'/g, "&#39;");
+    
+    html += `
+        <div class="mb-4 pb-4 border-b-2 border-amber-200">
+            <label class="block text-xs font-semibold text-gray-600 mb-2">대분류 키워드</label>
+            <div class="category-keyword-chip inline-flex items-center px-4 py-2 border-2 rounded-full text-base font-bold cursor-pointer transition-all shadow-sm ${categorySelectedClass}"
+                 data-scope="${scope}"
+                 data-term="${categoryTermAttr}"
+                 data-icon="${categoryIcon}"
+                 onclick="toggleKeywordSelection('${scope}', '${categoryTermEscaped}', '${categoryIcon}', 'vocabulary')">
+                <span class="mr-2">${categoryIcon}</span>
+                <span>${categoryTerm}</span>
+            </div>
+        </div>
+    `;
+    
+    for (const [subcategory, terms] of Object.entries(subcategories)) {
+        if (!terms || terms.length === 0) continue;
+        
+        // 중분류 정보 가져오기
+        const subcatInfo_item = subcatInfo[subcategory];
+        const subcatTerm = subcatInfo_item ? subcatInfo_item.term : subcategory;
+        const subcatIcon = subcatInfo_item ? subcatInfo_item.icon_key : '🔖';
+        
+        // 중분류 칩 추가
+        const isSubcatSelected = selectedKeywords[scope] && selectedKeywords[scope].some(k => k.term === subcatTerm);
+        const subcatSelectedClass = isSubcatSelected ? 'bg-amber-500 text-white border-amber-500' : 'bg-blue-100 text-blue-900 border-blue-300 hover:border-blue-400 hover:bg-blue-200';
+        
+        html += `
+            <div class="subcategory-group">
+                <div class="mb-3">
+                    <div class="subcategory-chip inline-flex items-center px-4 py-2 border-2 rounded-full text-base font-bold cursor-pointer transition-all shadow-sm ${subcatSelectedClass}"
+                         onclick="toggleKeywordSelection('${scope}', '${subcatTerm.replace(/'/g, "\\'")}', '${subcatIcon}', 'vocabulary')">
+                        <span class="mr-2">${subcatIcon}</span>
+                        <span>${subcatTerm}</span>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 ml-2">
+        `;
+        
+        terms.forEach(term => {
+            const isSelected = selectedKeywords[scope] && selectedKeywords[scope].some(k => k.term === term.term);
+            const selectedClass = isSelected ? 'bg-amber-500 text-white border-amber-500' : 'bg-[#fff8ee] text-[#7a5630] border-[#f1e0c8] hover:border-amber-400 hover:bg-amber-50';
+            
+            html += `
+                <div class="keyword-chip inline-flex items-center px-4 py-2 border-2 rounded-full text-base font-medium cursor-pointer transition-all ${selectedClass}" 
+                     data-scope="${scope}" 
+                     data-term="${term.term}" 
+                     data-icon="${term.icon_key || 'default'}"
+                     data-source-type="vocabulary"
+                     onclick="toggleKeywordSelection('${scope}', '${term.term.replace(/'/g, "\\'")}', '${term.icon_key || 'default'}', 'vocabulary')">
+                    <span class="keyword-icon mr-2">${term.icon_key || '🔖'}</span>
+                    <span>${term.term}</span>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    pickerContainer.innerHTML = html;
+}
+
+// 키워드 선택/해제 토글
+function toggleKeywordSelection(scope, term, icon, sourceType) {
+    const index = selectedKeywords[scope].findIndex(k => k.term === term);
+    
+    if (index >= 0) {
+        // 이미 선택된 경우 제거
+        removeKeyword(scope, index);
+    } else {
+        // 선택되지 않은 경우 추가
+        selectKeyword(scope, term, icon, sourceType);
+    }
+    
+    // UI 업데이트 (현재 카테고리 다시 표시)
+    if (currentCategory[scope]) {
+        displaySubcategories(scope, currentCategory[scope]);
+    }
+}
+
+// 커스텀 키워드 클릭 핸들러 설정
+function setupCustomKeywordClickHandlers() {
+    document.addEventListener('click', function(e) {
+        const chip = e.target.closest('.keyword-chip[data-source-type="user"]');
+        if (!chip) return;
+        
+        const scope = chip.dataset.scope;
+        const term = chip.dataset.term;
+        const icon = chip.dataset.icon || 'custom';
+        
+        if (!scope || !term) return;
+        
+        toggleKeywordSelection(scope, term, icon, 'user');
     });
 }
 
@@ -492,26 +670,46 @@ function getIconEmoji(iconKey) {
 }
 
 function updateKeywordUI(scope) {
-    // 선택된 키워드 칩 표시
+    // 선택된 키워드 칩 스타일 업데이트
     document.querySelectorAll(`[data-scope="${scope}"].keyword-chip`).forEach(chip => {
         const term = chip.dataset.term;
         const isSelected = selectedKeywords[scope].some(k => k.term === term);
-        if (isSelected) {
-            chip.classList.add('selected');
-            chip.style.backgroundColor = '#f59e0b';
-            chip.style.color = '#fff';
-            chip.style.borderColor = '#f59e0b';
-            chip.style.cursor = 'default';
+        
+        if (chip.dataset.sourceType === 'user') {
+            // 커스텀 키워드 스타일
+            if (isSelected) {
+                chip.classList.remove('bg-purple-100', 'border-purple-300', 'text-purple-800');
+                chip.classList.add('bg-purple-500', 'border-purple-500', 'text-white');
+            } else {
+                chip.classList.remove('bg-purple-500', 'border-purple-500', 'text-white');
+                chip.classList.add('bg-purple-100', 'border-purple-300', 'text-purple-800');
+            }
         } else {
-            chip.classList.remove('selected');
-            chip.style.backgroundColor = '#fff8ee';
-            chip.style.color = '#7a5630';
-            chip.style.borderColor = '#f1e0c8';
-            chip.style.cursor = 'pointer';
+            // 일반 키워드 스타일 (계층 구조 내 키워드는 displaySubcategories에서 처리)
         }
     });
     
-    // 선택된 키워드 리스트 표시 (순서 변경/삭제만)
+    // 대분류 키워드 칩 스타일 업데이트
+    document.querySelectorAll(`.category-keyword-chip[data-scope="${scope}"]`).forEach(chip => {
+        // HTML 엔티티를 원래 문자로 변환
+        const term = chip.dataset.term ? chip.dataset.term.replace(/&#39;/g, "'") : '';
+        const isSelected = selectedKeywords[scope] && selectedKeywords[scope].some(k => k.term === term);
+        
+        if (isSelected) {
+            chip.classList.remove('from-amber-100', 'to-amber-200', 'text-amber-900', 'border-amber-300');
+            chip.classList.add('bg-amber-500', 'text-white', 'border-amber-500');
+        } else {
+            chip.classList.remove('bg-amber-500', 'text-white', 'border-amber-500');
+            chip.classList.add('from-amber-100', 'to-amber-200', 'text-amber-900', 'border-amber-300');
+        }
+    });
+    
+    // 현재 카테고리 다시 표시하여 선택 상태 반영
+    if (currentCategory[scope]) {
+        displaySubcategories(scope, currentCategory[scope]);
+    }
+    
+    // 선택된 키워드 리스트 표시 (순서 변경/삭제)
     const detailsContainer = document.getElementById(`keyword-details-${scope}`);
     if (selectedKeywords[scope].length === 0) {
         detailsContainer.innerHTML = '';
@@ -520,12 +718,12 @@ function updateKeywordUI(scope) {
     
     detailsContainer.innerHTML = `
         <div class="bg-gray-50 rounded-lg p-4">
-            <label class="block text-sm font-semibold text-gray-700 mb-3">선택된 키워드</label>
+            <label class="block text-sm font-semibold text-gray-700 mb-3">선택된 키워드 (순서대로 표시됨)</label>
             <div class="space-y-2">
                 ${selectedKeywords[scope].map((kw, index) => `
                     <div class="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
                         <div class="flex items-center space-x-2">
-                            <span class="text-lg">${getIconEmoji(kw.icon_key || 'default')}</span>
+                            <span class="text-lg">${kw.icon_key || '🔖'}</span>
                             <span class="font-medium text-gray-900">${kw.term}</span>
                         </div>
                         <div class="flex gap-2">
@@ -576,24 +774,14 @@ async function addCustomKeyword() {
         });
         const data = await response.json();
         
-        // 키워드 목록에 추가
-        const keywordList = document.getElementById(`keyword-list-${currentCustomScope}`);
-        const newChip = document.createElement('div');
-        newChip.className = 'keyword-chip inline-flex items-center px-4 py-2 bg-[#fff8ee] border border-[#f1e0c8] rounded-full text-sm font-medium text-[#7a5630] hover:border-amber-400 hover:bg-amber-50 cursor-pointer transition-all';
-        newChip.dataset.scope = currentCustomScope;
-        newChip.dataset.term = term;
-        newChip.dataset.icon = 'custom';
-        newChip.dataset.sourceType = 'user';
-        newChip.innerHTML = `<span class="keyword-icon">${getIconEmoji('custom')}</span><span>${term}</span>`;
+        // 즉시 선택
+        selectKeyword(currentCustomScope, term, '🏷️', 'user');
         
-        // + 버튼 앞에 삽입
-        const addButton = keywordList.querySelector('button');
-        keywordList.insertBefore(newChip, addButton);
-        
-        // 즉시 선택 (이벤트 위임으로 클릭 이벤트가 자동 처리됨)
-        selectKeyword(currentCustomScope, term, 'custom', 'user');
-        
+        // 페이지 새로고침하여 커스텀 키워드 목록 업데이트
+        // (더 나은 방법: 동적으로 DOM에 추가)
         closeCustomKeywordModal();
+        alert('커스텀 키워드가 추가되었습니다. 키워드가 선택되었습니다.');
+        
     } catch (error) {
         alert('커스텀 키워드 추가 실패: ' + error.message);
     }
@@ -675,8 +863,8 @@ document.getElementById('note-form').addEventListener('submit', async function(e
 
 // 초기 로드 시 기존 총평을 한 줄씩 분해
 window.addEventListener('DOMContentLoaded', () => {
-    // 키워드 클릭 핸들러 설정
-    setupKeywordClickHandlers();
+    // 커스텀 키워드 클릭 핸들러 설정
+    setupCustomKeywordClickHandlers();
     
     // 전체 총평
     const hidden = document.getElementById('overall_comment');

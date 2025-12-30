@@ -48,15 +48,20 @@ class NoteKeyword(Base):
 class VocabularyTerm(Base):
     __tablename__ = "vocabulary_terms"
     __table_args__ = (
-        # (scope, term) 조합이 unique하도록 설정
-        # 같은 term이 여러 scope에 나타날 수 있음
-        UniqueConstraint('scope', 'term', name='uix_scope_term'),
+        # (scope, term, level) 조합이 unique하도록 설정
+        # 같은 term이 같은 scope에서 level이 다르면 별도로 저장 가능
+        # 예: "견과류" (level=1)과 "견과류" (level=2)는 별도 항목
+        UniqueConstraint('scope', 'term', 'level', name='uix_scope_term_level'),
     )
     
     id = Column(Integer, primary_key=True, index=True)
     scope = Column(String, nullable=False, index=True)  # nose, palate, finish
     term = Column(String, nullable=False, index=True)
     icon_key = Column(String, nullable=True)
+    # Flavor Wheel 계층 구조 지원
+    category = Column(String, nullable=True, index=True)  # 대분류: FRUITY, FLORAL, SWEET, NUTTY, SPICY, SAVORY
+    subcategory = Column(String, nullable=True)  # 중분류: BERRY, CITRUS, VANILLA 등
+    level = Column(Integer, default=3)  # 1=대분류, 2=중분류, 3=세부키워드
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
